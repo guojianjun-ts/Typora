@@ -1,5 +1,42 @@
 # Git: 最先进的分布式版本控制系统
 
+## 常用工作流程
+
+1. 选择项目的根目录初始化仓库
+
+   ~~~bash
+   git init
+   ~~~
+
+2. 关联本地git仓库和远程 Github 仓库
+
+   ~~~bash
+   git remote add origin <远程仓库URL> #例如git@github.com:guojianjun-ts/Gen-BI.git
+   ~~~
+
+3. 添加本地代码至git暂存区
+
+   ~~~bash
+   git add . #添加全部文件
+   git add <fileName> #添加单文件
+   ~~~
+
+4. 提交暂存区文件至git版本库
+
+   ~~~bash
+   git commit -m "comment"
+   ~~~
+
+5. 推送本地代码到远程 Github 仓库中
+
+   ~~~bash
+   git push origin master
+   ~~~
+
+   
+
+
+
 ## 故事背景：
 
 ​	没用过Git前，用Word想删除一个段落，又怕将来想把Word恢复但找不回来。这是只能先将Word**另存为**一个’ 新文件 ‘了，用不了多久，你的Word可能就会变成了下图这样的**多个副本**了。
