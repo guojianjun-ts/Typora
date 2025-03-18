@@ -279,23 +279,6 @@
    2. 对空表格进行过滤的处理
 
    ~~~java
-   package com.yupi.springbootinit.utils;
-   
-   import cn.hutool.core.collection.CollUtil;
-   import com.alibaba.excel.EasyExcel;
-   import com.alibaba.excel.support.ExcelTypeEnum;
-   import lombok.extern.slf4j.Slf4j;
-   import org.apache.commons.lang3.ObjectUtils;
-   import org.apache.commons.lang3.StringUtils;
-   import org.springframework.web.multipart.MultipartFile;
-   
-   import java.io.IOException;
-   import java.util.LinkedHashMap;
-   import java.util.List;
-   import java.util.Map;
-   import java.util.stream.Collectors;
-   
-   
    /**
     * Excel 相关工具类
     */
@@ -391,17 +374,6 @@
    - 在后端Config中增添DeepSeekClientConfig类，作为一个客户端
 
    ~~~java
-   package com.yupi.springbootinit.config;
-   
-   import com.tencentcloudapi.common.Credential;
-   import com.tencentcloudapi.common.profile.ClientProfile;
-   import com.tencentcloudapi.common.profile.HttpProfile;
-   import com.tencentcloudapi.lkeap.v20240522.LkeapClient;
-   import lombok.Data;
-   import org.springframework.boot.context.properties.ConfigurationProperties;
-   import org.springframework.context.annotation.Bean;
-   import org.springframework.context.annotation.Configuration;
-   
    @Configuration
    @ConfigurationProperties(prefix = "tencent.deepseek.client")
    @Data
@@ -440,9 +412,9 @@
    }
    
    ~~~
-
+   
    - 在配置中，加上腾讯云deep seek接口的账号和密码
-
+   
       ~~~apl
       tencent:
         deepseek:
@@ -450,9 +422,9 @@
             secretId: 我的账号
             secretKey: 我的密码
       ~~~
-
+   
    - 新建一个VO层对象，BiResponse作为deepseek的返回实体
-
+   
    ~~~java
    package com.yupi.springbootinit.model.vo;
    
@@ -471,26 +443,12 @@
        private Long chartId;
    }
    ~~~
-
    
-
+   
+   
    - 新增AiManager，作为一个请求实体对象
-
+   
    ~~~java
-   package com.yupi.springbootinit.manager;
-   
-   import com.tencentcloudapi.common.exception.TencentCloudSDKException;
-   import com.tencentcloudapi.lkeap.v20240522.LkeapClient;
-   import com.tencentcloudapi.lkeap.v20240522.models.ChatCompletionsRequest;
-   import com.tencentcloudapi.lkeap.v20240522.models.ChatCompletionsResponse;
-   import com.tencentcloudapi.lkeap.v20240522.models.Message;
-   import com.yupi.springbootinit.common.ErrorCode;
-   import com.yupi.springbootinit.exception.BusinessException;
-   import lombok.extern.slf4j.Slf4j;
-   import org.springframework.stereotype.Service;
-   
-   import javax.annotation.Resource;
-   
    /**
     * 用于对接 AI 平台
     */
@@ -550,11 +508,11 @@
        }
    }
    ~~~
-
    
-
+   
+   
    - 重写/gen接口
-
+   
    ~~~java
        /**
         * 智能分析（同步）
@@ -637,4 +595,220 @@
        }
    ~~~
 
+
+##### 前端部分
+
+- 先开发用户表单页面
+
+  直接拿Login的开发页面，复制并重构到/AddChart里
+
+- 再到routes中去追加一个/add_chart的路由
+
+  ~~~ts
+  { path: '/', redirect: '/add_chart' },
+  { path: '/add_chart', name: '智能分析', icon: 'barChart', component: './AddChart' },
+  ~~~
+
+- 然后运行一下openapi，自动生成前端调用代码
+
+- 最后就是利用[Ant Design组件库](https://ant.design/components/overview-cn/)中优化下前端的代码样式和一些xiu xiu的功能
+
+### 2024/3/16 第四期
+
+#### 本期计划：
+
+1. 开发图表管理功能(MyChart)
+   1. 规划功能设计
+   2. 创建路由和页面
+   3. 获取数据并美化数据
+2. 优化系统
+   1. 安全性
+   2. 数据存储
+      1. 分开存储
+      2. 分开查询
+   3. 限流
+      1. 限流的算法
+      2. 限流粒度
+      3. 本地限流or分布式限流
+      4. Redisson限流的实现
+
+#### 详细日志：
+
+##### 一、前端图表管理功能开发
+
+- 创建路由：
+
+~~~tsx
+ { name:'我的图表',path: '/my_chart', icon: 'pieChart', component: './MyChart' },
+~~~
+
+- 结合ant.design组件库开发MyChart.index页面
+
+##### 二、系统优化
+
+1. 安全性问题：
+
+   - 文件检验(限制文件大小、文件的后缀以防止被恶意攻击)
+
+   ~~~java
+   // 校验
+   ThrowUtils.throwIf(org.apache.commons.lang3.StringUtils.isBlank(goal),ErrorCode.PARAMS_ERROR, "目标为空");
+   ThrowUtils.throwIf(org.apache.commons.lang3.StringUtils.isNotBlank(name) && name.length() > 100, ErrorCode.PARAMS_ERROR, "名称过长");
+   // 校验文件
+   long size = multipartFile.getSize();
+   String originalFilename = multipartFile.getOriginalFilename();
+   // 校验文件大小
+   final long ONE_MB = 1024 * 1024L;
+   ThrowUtils.throwIf(size > ONE_MB, ErrorCode.PARAMS_ERROR, "文件超过 1M");
+   // 校验文件后缀 aaa.png
+   String suffix = FileUtil.getSuffix(originalFilename);
+   final List<String> validFileSuffixList = Arrays.asList("xlsx");
+   ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR,"文件后缀非法");
    
+   ~~~
+
+2. 数据存储问题：
+
+   - 假设用户上传的图表数据很大很大，那么只用一个数据表来存储所有用户的图表数据，会使得后期查表越来越困难，越来越慢。
+
+   - :grin:解决方案：
+
+      - **水平分表**：把每个图表对应的原始数据单独保存为一个新的数据表，而不是都存在一个字段里。
+
+      - **分开存储**：存储图表信息时，不把数据存储为字段，而是新建一个 chart_{图表id} 的数据表。 通过图表 id、数据列名、数据类型等字段，生成以下 SQL 语句，并且执行即可：
+
+         ```sql
+         create table chart_1659210482555121666
+         (
+           日期  int null,
+           用户数 int null
+         );
+         ```
+
+      - **分开查询**：以前直接查询图表，取 chartData 字段；现在改为读取 chart_{图表id} 的数据表。
+
+         ```sql
+         select * from chart_{1659210482555121666};
+         ```
+
+3. 成本问题：
+
+   - 假设腾讯云的ds只支持10个用户同时会话，有个恶意用户同时使用10个账号登录，那么会挤得其它用户无法去使用服务，又或者是有用户一直调用系统，导致成本一直在消耗，这也是要禁止的。
+
+   - :grinning:解决方案：
+
+      - 限流：针对上述的假设，限制用户短时间内的调用次数  |  限制用户调用总次数。
+
+      - 使用基于**令牌桶算法**思想的Redisson来实现：
+
+         - 添加Redis的依赖
+
+         ~~~xml
+         <dependency>
+         	<groupId>org.redisson</groupId>
+         	<artifactId>redisson</artifactId>
+         	<version>3.21.3</version>
+         </dependency>
+         ~~~
+
+         - 在Config包下编写RedissonConfig.java类
+
+         ~~~java
+         @Configuration
+         // 从application.yml文件中读取前缀为"spring.redis"的配置项
+         @ConfigurationProperties(prefix = "spring.redis")
+         @Data
+         public class RedissonConfig {
+         
+             private Integer database;
+         
+             private String host;
+         
+             private Integer port;
+             // 如果redis默认没有密码，则不用写
+             //private String password;
+         
+             // spring启动时，会自动创建一个RedissonClient对象
+             @Bean
+             public RedissonClient getRedissonClient() {
+                 // 1.创建配置对象
+                 Config config = new Config();
+                 // 添加单机Redisson配置
+                 config.useSingleServer()
+                 // 设置数据库
+                 .setDatabase(database)
+                 // 设置redis的地址
+                 .setAddress("redis://" + host + ":" + port);
+                 // 设置redis的密码(redis有密码才设置)
+                 //                .setPassword(password);
+         
+                 // 2.创建Redisson实例
+                 RedissonClient redisson = Redisson.create(config);
+                 return redisson;
+             }
+         }
+         ~~~
+
+         - 去application.yml文件中添加redis相关配置
+         - 在Manager包中建立RedisLimiterManager.java类
+
+         ~~~java
+         /**
+          * 专门提供 RedisLimiter 限流基础服务的（提供了通用的能力,放其他项目都能用）
+          */
+         @Service
+         public class RedisLimiterManager {
+         
+             @Resource
+             private RedissonClient redissonClient;
+         
+             /**
+              * 限流操作
+              *
+              * @param key 区分不同的限流器，比如不同的用户 id 应该分别统计
+              */
+             public void doRateLimit(String key) {
+                 // 创建一个名称为user_limiter的限流器，每秒最多访问 2 次
+                 RRateLimiter rateLimiter = redissonClient.getRateLimiter(key);
+                 // 限流器的统计规则(每秒2个请求;连续的请求,最多只能有1个请求被允许通过)
+                 // RateType.OVERALL表示速率限制作用于整个令牌桶,即限制所有请求的速率
+                 rateLimiter.trySetRate(RateType.OVERALL, 2, 1, RateIntervalUnit.SECONDS);
+                 // 每当一个操作来了后，请求一个令牌
+                 boolean canOp = rateLimiter.tryAcquire(1);
+                 // 如果没有令牌,还想执行操作,就抛出异常
+                 if (!canOp) {
+                     throw new BusinessException(ErrorCode.TOO_MANY_REQUEST);
+                 }
+             }
+         }
+         ~~~
+
+         - 测试完成后，去genChartByAi接口处做一个限流判断，不符合抛出自定义的一个Error
+
+         ~~~java
+         TOO_MANY_REQUEST(42900, "请求过于频繁"),
+         ~~~
+
+
+### 2025/3/19第五期
+
+#### 本期计划：
+
+1. 分析系统目前存在的问题
+2. 异步化业务流程分析
+3. 学习用线程池来实现异步化
+4. 前后端异步化改造
+
+#### 详细日志：
+
+
+
+### 2025/3/19第五期
+
+#### 本期计划：
+
+1. 进一步分析系统的不足
+2. 学习消息队列和分布式消息队列
+3. :star2:学习使用RabbitMQ
+
+#### 详细日志：
